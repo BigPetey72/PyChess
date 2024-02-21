@@ -71,11 +71,9 @@ class GameState():
     def getAllMovesPiece(self, r, c):
         moves = []
         if not self.isFriendly:
-            print("Not Friendly")
             return moves
         
         piece = self.board[r][c][1]
-        print("piece:", piece)
         if piece == 'P':
             self.getPawnMoves(r, c, moves)
         elif piece == 'R':
