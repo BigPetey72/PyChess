@@ -25,22 +25,71 @@ class GameState():
         
         self.whiteToMove = True
         self.moveLog = []
+        self.friendly = {True : 'w', False : 'b'} # index this dict with self.whiteToMove
+
+        # Bools for castling conditions
+        self.whiteKingMoved = False
+        self.blackKingMoved = False
+        self.longWhiteRookMoved = False
+        self.shortWhiteRookMoved = False
+        self.longBlackRookMoved = False
+        self.shortBlackRookMoved = False
     
     def makeMove(self, move):
-        print("making move")
+        #print("making move")
+        # play sound effects
+        #if self.isEnemy(move.endRow, move.endCol):
+            #play capture sound
+        #play move sound
         self.board[move.startRow][move.startCol] = '--'
         self.board[move.endRow][move.endCol] = move.pieceMoved
         self.moveLog.append(move) # add move to move log to keep history and potentially undo moves
 
+    # returns true if coord pair is within the 8x8 board
+    def validCoords(self, r, c):
+        return r < 8 and r > -1 and c < 8 and c > -1
+    
+    # returns True if the square is an enemy piece or empty
     def selectWrongSquare(self, r, c) -> bool:
-        c = self.board[r][c][0]
-        if self.whiteToMove:
-            return c == 'b' or c == '-'
-        return c == 'w' or c == '-'
+        return not self.isFriendly(r, c)
+    
     # returns True if the square is currently empty
-    def squareEmpty(self, r, c) -> bool:
+    def isEmpty(self, r, c) -> bool:
         return self.board[r][c] == "--"
     
+    # returns True if square contains a friendly piece, otherwise False
+    def isFriendly(self, r, c) -> bool:
+        return self.board[r][c][0] == self.friendly[self.whiteToMove]
+    
+    # returns True if square contains an enemy piece, otherwise False
+    def isEnemy(self, r, c):
+        return self.board[r][c][0] == self.friendly[not self.whiteToMove]
+    
+    def getValidMovesPiece(self, r, c):
+        return self.getAllMovesPiece(r, c)
+    
+    def getAllMovesPiece(self, r, c):
+        moves = []
+        if not self.isFriendly:
+            print("Not Friendly")
+            return moves
+        
+        piece = self.board[r][c][1]
+        print("piece:", piece)
+        if piece == 'P':
+            self.getPawnMoves(r, c, moves)
+        elif piece == 'R':
+            self.getRookMoves(r, c, moves)
+        elif piece == 'B':
+            self.getBishopMoves(r, c, moves)
+        elif piece == 'N':
+            self.getKnightMoves(r, c, moves)
+        elif piece == 'Q':
+            self.getQueenMoves(r, c, moves)
+        elif piece == 'K':
+            self.getKingMoves(r, c, moves)
+        return moves
+        
     def getValidMoves(self):
         return self.getAllMoves()
 
@@ -65,8 +114,8 @@ class GameState():
                         self.getQueenMoves(r, c, moves)
                     elif piece == 'K':
                         self.getKingMoves(r, c, moves)
-        for move in moves:
-            print("valid:", move.getChessNotation())
+        #for move in moves:
+            #print("valid:", move.getChessNotation())
         return moves
     
     def getPawnMoves(self, r, c, moves):
@@ -124,27 +173,23 @@ class GameState():
         # check down, right
         self.checkDir((-1, 1), r, c, moves)
         # check dowm, left
-        print("moves before:")
-        for move in moves:
-            print(move.getChessNotation())
+        #print("moves before:")
+        #for move in moves:
+        #    print(move.getChessNotation())
         self.checkDir((-1, -1), r, c, moves)
-        print("moves after:")
-        for move in moves:
-            print(move.getChessNotation())
+        #print("moves after:")
+        #for move in moves:
+        #    print(move.getChessNotation())
 
-
+    #BUGGED
     def getKnightMoves(self, r, c, moves):
-        if self.whiteToMove:
-            friendly = 'b'
-        else:
-            friendly = 'w'
-
         moveList = [(2, 1), (2, -1), (-2, 1), (-2, -1), (1, 2), (1, -2), (-1, 2), (-1, -2)]
 
         for m in moveList:
-            if r + m[0] > 7 or r + m[0] < 0 or c + m[1] > 7 or c + m[1] < 0:
+            if not self.validCoords(r + m[0], c + m[1]):
                 continue
-            if self.board[r + m[0]][c + m[1]][0] != friendly:
+            if not self.isFriendly(r + m[0], c + m[1]):
+                print("Valid Knight Move:", Move((r, c), (r + m[0], c + m[1]), self.board).getChessNotation())
                 moves.append(Move((r, c), (r + m[0], c + m[1]), self.board))
 
     def getQueenMoves(self, r, c, moves):
@@ -167,35 +212,35 @@ class GameState():
 
 
     def getKingMoves(self, r, c, moves):
-        pass
+        moveDirs = [-1, 0, 1]
+        for yDir in moveDirs:
+            for xDir in moveDirs:
+                # cannot move in no direction
+                if xDir == yDir == 0:
+                    continue
+                if not self.validCoords(r + yDir, c + xDir) or self.isFriendly(r + yDir, c + xDir):
+                    continue
+                moves.append(Move((r, c), (r + yDir, c + xDir), self.board))
+
 
     # check dir gets passed a tuple to check until end of board in that direction(inversed), (1, 0) in increasing row direction, (1, 1) check diagonal
     def checkDir(self, dir, r, c, moves):
-        print("Checking Dir:", dir, "Square:", r, c)
         row, col = r, c
         vert, horz = dir[0], dir[1]
         while(row + vert >= 0 and row + vert <= 7 and col + horz >= 0 and col + horz <= 7):
-            print ("in while loop")
-            print("row:", row, "col:", col, "vert:", vert, "horz", horz)
-            char = self.board[row+vert][col+horz][0]
             # ran into empty square
-            if char == '-':
-                print("empty square")
+            if self.isEmpty(row + vert, col + horz):
                 moves.append(Move((r,c), (row+vert, col+horz), self.board))
             # ran into enemy piece
-            elif (self.whiteToMove and char == 'b') or (not self.whiteToMove and char == 'w'):
-                print("enemy sqaure")
+            elif self.isEnemy(row + vert, col + horz):
                 moves.append(Move((r,c), (row+vert, col+horz), self.board))
                 break
             # ran into friendly piece
             else:
-                print("friendly square")
                 break
             row += vert
             col += horz
 
-
-            
 
 class Move():
     ranksToRows = {"1": 7, "2": 6, "3": 5, "4": 4,
@@ -212,7 +257,7 @@ class Move():
         self.endCol = endSq[1]
         self.pieceMoved = board[self.startRow][self.startCol]
         self.pieceCaptured = board[self.endRow][self.endCol]
-    
+
     def getChessNotation(self):
         return self.getRankFile(self.startRow, self.startCol) + self.getRankFile(self.endRow, self.endCol)
 

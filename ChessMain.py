@@ -10,6 +10,7 @@ DIMENSION = 8
 SQ_SIZE = HEIGHT // DIMENSION
 MAX_FPS = 165
 IMAGES = {}
+SOUNDS = {}
 
 """
 Initialize a global directory of images. This will be called exactly once in the main
@@ -21,6 +22,11 @@ def loadImages():
         IMAGES[piece] = p.image.load("Pieces/" + piece + ".png")
         IMAGES[piece] = p.transform.scale(IMAGES[piece], (SQ_SIZE, SQ_SIZE))
 
+def loadSounds():
+    sounds = ['capture', 'move-self']
+    for sound in sounds:
+        SOUNDS[sound] = p.mixer.Sound("Sounds/" + sound + ".mp3")
+
 def main():
     p.init()
     screen = p.display.set_mode((WIDTH, HEIGHT))
@@ -28,6 +34,7 @@ def main():
     screen.fill(p.Color("white"))
     gs = ChessEngine.GameState()
     loadImages() # loading image files, only do this once
+    loadSounds() # loading sounds files, only do once
     running = True
     sqSelected = () # keep track of the square selected by the last click of the user, tuple(row, col)
     playerClicks = [] # keep track of player clicks (two tuples: [(6, 4), (4, 4)])
@@ -58,6 +65,9 @@ def main():
                     print(move.getChessNotation())
                     if move in validMoves:
                         print("valid move")
+                        if gs.isEnemy(move.endRow, move.endCol):
+                            p.mixer.Sound.play(SOUNDS['capture'])
+                        p.mixer.Sound.play(SOUNDS['move-self'])
                         gs.makeMove(move)
                         moveMade = True
                     sqSelected = ()
@@ -68,14 +78,28 @@ def main():
             validMoves = gs.getValidMoves()
             moveMade = False
         
-        drawGameState(screen, gs)
+        drawGameState(screen, gs, playerClicks)
         clock.tick(MAX_FPS)
         p.display.flip()
 
-def drawGameState(screen, gs):
+def drawGameState(screen, gs, playerClicks):
     drawBoard(screen) # draw squares on the board
     # add in piece highlighting, move suggestions
+    if len(playerClicks) == 1:
+        highlightSquare(screen, playerClicks[0][0], playerClicks[0][1])
+        moveSuggestions(screen, gs, playerClicks[0][0], playerClicks[0][1])
     drawPieces(screen, gs.board)
+
+def highlightSquare(screen, r, c):
+    p.draw.rect(screen, p.Color("green"), p.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
+
+def moveSuggestions(screen, gs, r, c):
+    moves = gs.getValidMovesPiece(r, c)
+    for move in moves:
+        r = move.endRow
+        c = move.endCol
+        p.draw.rect(screen, p.Color("green"), p.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
+
 
 def drawBoard(screen):
     colors = [p.Color(211, 182, 131), p.Color(43, 29, 20)]
