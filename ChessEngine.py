@@ -3,19 +3,30 @@ This class is responsible for storing all of the information about the current s
 responsible for determining the valid moves and keeping a move log.
 Can use numpy arrays to make this faster
 """
-
+import copy
 class GameState():
-    def __init__(self):
+    def __init__(self, test=False):
         # 8x8 2D List 
-        self.board = [
-            ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
-            ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
+        if test:
+            self.board = [
+            ["--", "--", "--", "--", "bK", "--", "--", "--"],
+            ["--", "--", "--", "--", "bR", "--", "--", "--"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
-            ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
-            ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"]]
+            ["--", "--", "--", "--", "wR", "--", "--", "--"],
+            ["--", "--", "--", "--", "wK", "--", "--", "--"]]
+        else:
+            self.board = [
+                ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
+                ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
+                ["--", "--", "--", "--", "--", "--", "--", "--"],
+                ["--", "--", "--", "--", "--", "--", "--", "--"],
+                ["--", "--", "--", "--", "--", "--", "--", "--"],
+                ["--", "--", "--", "--", "--", "--", "--", "--"],
+                ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
+                ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"]]
         
         """
         self.whitePieces = [Rook(), Knight(), Bishop(), Queen(), King(), Bishop(), Knight(), Rook(),
@@ -34,16 +45,48 @@ class GameState():
         self.shortWhiteRookMoved = False
         self.longBlackRookMoved = False
         self.shortBlackRookMoved = False
+        self.whiteKingInCheck = False
+        self.blackKingInCheck = False
+
+        # King Locations for checks
+        self.whiteKingLoc = (7, 4)
+        self.blackKingLoc = (0, 4)
+    
+    def kingMove(self, r, c):
+        if self.whiteToMove:
+            print("Moving white King to:", r, c)
+            self.whiteKingLoc = (r, c)
+            self.whiteKingMoved = True
+        else:
+            print("Moving black King to:", r, c)
+            self.blackKingLoc = (r, c)
+            self.blackKingMovd = True
+
+    def isKing(self, r, c):
+        return (self.whiteToMove and self.whiteKingLoc == (r, c)) or (not self.whiteToMove and self.blackKingLoc == (r, c))
+    
+    def isEnemyKing(self, r, c):
+        return (self.whiteToMove and self.blackKingLoc == (r, c)) or (not self.whiteToMove and self.whiteKingLoc == (r, c))
     
     def makeMove(self, move):
-        #print("making move")
-        # play sound effects
-        #if self.isEnemy(move.endRow, move.endCol):
-            #play capture sound
-        #play move sound
+        if self.isKing(move.startRow, move.startCol):
+            self.kingMove(move.endRow, move.endCol)
+
         self.board[move.startRow][move.startCol] = '--'
         self.board[move.endRow][move.endCol] = move.pieceMoved
         self.moveLog.append(move) # add move to move log to keep history and potentially undo moves
+
+    def undoMove(self):
+        if (not len(self.moveLog)):
+            print("Warning: Cannot undo move with no moves made")
+            return
+        
+        move = self.moveLog[len(self.moveLog) - 1]
+        if self.isKing(move.endRow, move.endCol):
+            self.kingMove(move.startRow, move.startCol)
+        self.board[move.endRow][move.endCol] = move.pieceCaptured
+        self.board[move.startRow][move.startCol] = move.pieceMoved
+        del self.moveLog[len(self.moveLog) - 1]
 
     # returns true if coord pair is within the 8x8 board
     def validCoords(self, r, c):
@@ -87,9 +130,32 @@ class GameState():
         elif piece == 'K':
             self.getKingMoves(r, c, moves)
         return moves
-        
+    
+    # Have to loop through all possible moves and see if any of them expose the current King to a check
     def getValidMoves(self):
-        return self.getAllMoves()
+        allMoves = self.getAllMoves()
+        invalidMoveList = []
+        print("allMoves len:", len(allMoves))
+        
+        for move in allMoves:
+            self.makeMove(move)
+            self.whiteToMove = not self.whiteToMove
+            oppAllMoves = self.getAllMoves()
+
+            for oppMove in oppAllMoves:
+                if self.isEnemyKing(oppMove.endRow, oppMove.endCol):
+                    print("invalid move")
+                    print("player move:", move.startRow, move.startCol, "->", move.endRow, move.endCol)
+                    print("opp move:", oppMove.startRow, oppMove.startCol, "->", oppMove.endRow, oppMove.endCol)
+                    invalidMoveList.append(move)
+                    break
+            self.whiteToMove = not self.whiteToMove
+            self.undoMove()
+            print("#" * 30)
+        
+        for move in invalidMoveList:
+            allMoves.remove(move)
+        return allMoves
 
     def getAllMoves(self):
         moves = []
@@ -187,7 +253,6 @@ class GameState():
             if not self.validCoords(r + m[0], c + m[1]):
                 continue
             if not self.isFriendly(r + m[0], c + m[1]):
-                print("Valid Knight Move:", Move((r, c), (r + m[0], c + m[1]), self.board).getChessNotation())
                 moves.append(Move((r, c), (r + m[0], c + m[1]), self.board))
 
     def getQueenMoves(self, r, c, moves):
@@ -253,8 +318,8 @@ class Move():
         self.startCol = startSq[1]
         self.endRow = endSq[0]
         self.endCol = endSq[1]
-        self.pieceMoved = board[self.startRow][self.startCol]
-        self.pieceCaptured = board[self.endRow][self.endCol]
+        self.pieceMoved = copy.deepcopy(board[self.startRow][self.startCol])
+        self.pieceCaptured = copy.deepcopy(board[self.endRow][self.endCol])
 
     def getChessNotation(self):
         return self.getRankFile(self.startRow, self.startCol) + self.getRankFile(self.endRow, self.endCol)

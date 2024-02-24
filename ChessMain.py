@@ -90,6 +90,17 @@ def main():
                         playerClicks = []
                         activePiece = ()
 
+            elif e.type == p.KEYDOWN and p.K_z:
+                gs.undoMove()
+                moveMade = True
+
+            elif e.type == p.KEYDOWN and p.K_r:
+                gs = ChessEngine.GameState(test=True)
+                playerClicks = []
+                validMoves = gs.getValidMoves()
+                moveMade = False
+                activePiece = ()
+
 
         if moveMade:
             gs.whiteToMove = not gs.whiteToMove
@@ -115,7 +126,6 @@ def moveSuggestions(screen, gs, r, c):
     moves = gs.getValidMovesPiece(r, c)
     for move in moves:
         row, col = move.endRow, move.endCol
-        print ("row:", row, "col:", col)
         center = ((col+1) * SQ_SIZE - SQ_SIZE//2, (row+1) * SQ_SIZE - SQ_SIZE//2 )
         p.draw.circle(screen, p.Color("black"), center, SQ_SIZE//8)
         #p.draw.rect(screen, p.Color("green"), p.Rect(col * SQ_SIZE, row * SQ_SIZE, SQ_SIZE, SQ_SIZE))
